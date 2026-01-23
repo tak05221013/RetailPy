@@ -29,16 +29,16 @@
   const ENABLE_AUTO_RELOAD = true;
 
   // 「最初のレスポンスをログしたら」何秒後にリロードするか
-  const RELOAD_DELAY_MS = 10000;
+  const RELOAD_DELAY_MS = 1000;
 
   // リロードの最短間隔（短すぎると負荷＆制限の原因になりやすい）
-  const MIN_RELOAD_INTERVAL_MS = 10000;
+  const MIN_RELOAD_INTERVAL_MS = 1000;
 
   // 同一タブで最大何回までリロードするか（無限ループ防止）
-  const MAX_RELOADS_PER_TAB = 1000;
+  const MAX_RELOADS_PER_TAB = 10000;
 
   // タブが裏にあるときはリロードしない（任意）
-  const RELOAD_ONLY_WHEN_VISIBLE = true;
+  const RELOAD_ONLY_WHEN_VISIBLE = false;
 
   // ---- Internal state (per-tab) ----
   const STATE_KEY = "__mc_auto_reload_state_v1";
