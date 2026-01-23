@@ -7,7 +7,7 @@ from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 import pymysql
 
-API_KEY = os.environ.get("MC_LOG_API_KEY", "")
+API_KEY = os.environ.get("MC_LOG_API_KEY", "golden")
 MYSQL_HOST = os.environ.get("MC_MYSQL_HOST", "192.168.1.1")
 MYSQL_PORT = int(os.environ.get("MC_MYSQL_PORT", "3306"))
 MYSQL_USER = os.environ.get("MC_MYSQL_USER", "retail")

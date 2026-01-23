@@ -5,7 +5,8 @@
 // @description  Log request/response for MapCamera itemsearch API calls and auto-reload after first response
 // @match        https://www.mapcamera.com/*
 // @run-at       document-start
-// @grant        none
+// @grant GM_xmlhttpRequest
+// @connect 160.251.10.136
 // ==/UserScript==
 
 (() => {
@@ -20,17 +21,17 @@
 
   // ---- Docs ingest ----
   const DOCS_INGEST_ENABLED = true;
-  const DOCS_INGEST_URL = "http://localhost:8000/mapcamera-search-docs";
-  const DOCS_INGEST_API_KEY = "";
+  const DOCS_INGEST_URL = "http://160.251.10.136:8000/mapcamera-search-docs";
+  const DOCS_INGEST_API_KEY = "golden";
 
   // ---- Auto reload controls ----
   const ENABLE_AUTO_RELOAD = true;
 
   // 「最初のレスポンスをログしたら」何秒後にリロードするか
-  const RELOAD_DELAY_MS = 1_000;
+  const RELOAD_DELAY_MS = 10000;
 
   // リロードの最短間隔（短すぎると負荷＆制限の原因になりやすい）
-  const MIN_RELOAD_INTERVAL_MS = 1_000;
+  const MIN_RELOAD_INTERVAL_MS = 10000;
 
   // 同一タブで最大何回までリロードするか（無限ループ防止）
   const MAX_RELOADS_PER_TAB = 1000;
