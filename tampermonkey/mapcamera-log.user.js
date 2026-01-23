@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MapCamera ItemSearch Request+Response Logger + Auto Reload
 // @namespace    https://www.mapcamera.com/
-// @version      1.3.0
+// @version      1.4.0
 // @description  Log request/response for MapCamera itemsearch API calls and auto-reload after first response
 // @match        https://www.mapcamera.com/*
 // @run-at       document-start
@@ -17,6 +17,11 @@
 
   // ---- Log controls ----
   const MAX_LOG_CHARS = 20_000;
+
+  // ---- Docs ingest ----
+  const DOCS_INGEST_ENABLED = true;
+  const DOCS_INGEST_URL = "http://localhost:8000/mapcamera-search-docs";
+  const DOCS_INGEST_API_KEY = "";
 
   // ---- Auto reload controls ----
   const ENABLE_AUTO_RELOAD = true;
@@ -156,6 +161,33 @@
     return { ...meta, body: payload };
   };
 
+  const postDocs = async (docs, context) => {
+    if (!DOCS_INGEST_ENABLED) return;
+    if (!DOCS_INGEST_API_KEY) {
+      console.warn("[MapCamera][docs][skip] missing DOCS_INGEST_API_KEY");
+      return;
+    }
+    if (!Array.isArray(docs) || docs.length === 0) return;
+    try {
+      await fetch(DOCS_INGEST_URL, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": DOCS_INGEST_API_KEY,
+        },
+        body: JSON.stringify({
+          client_ts_ms: Date.now(),
+          page_url: location.href,
+          context,
+          docs,
+        }),
+        keepalive: true,
+      });
+    } catch (e) {
+      console.warn("[MapCamera][docs][error]", String(e));
+    }
+  };
+
   // ---- Auto reload trigger: "first response in this page load" ----
   let reloadScheduledThisPage = false;
 
@@ -226,6 +258,10 @@
         if (ct.includes("application/json")) {
           const data = await clone.json();
           logResponse(url, "fetch", buildResponseInfo(data, { status: res.status, contentType: ct }));
+          const docs = pickDocs(data);
+          if (docs) {
+            void postDocs(docs, "fetch");
+          }
         } else {
           const text = await clone.text();
           const parsed = safeJsonParse(text);
@@ -234,6 +270,10 @@
             "fetch",
             buildResponseInfo(parsed ?? truncate(text), { status: res.status, contentType: ct }),
           );
+          const docs = pickDocs(parsed);
+          if (docs) {
+            void postDocs(docs, "fetch");
+          }
         }
 
         // ★「レスポンスを1回ログした」＝処理完了、でリロード
@@ -294,12 +334,20 @@
                 responseType: this.responseType || "text",
               }),
             );
+            const docs = pickDocs(parsed);
+            if (docs) {
+              void postDocs(docs, "xhr");
+            }
           } else if (this.responseType === "json") {
             logResponse(
               u,
               "xhr",
               buildResponseInfo(this.response, { status, contentType: ct, responseType: "json" }),
             );
+            const docs = pickDocs(this.response);
+            if (docs) {
+              void postDocs(docs, "xhr");
+            }
           } else if (this.responseType === "arraybuffer") {
             const ab = this.response;
             logResponse(u, "xhr", {
