@@ -167,9 +167,9 @@
     const abs = toAbsoluteUrl(url);
     if (Array.isArray(info?.docs)) {
       const { docs, ...meta } = info;
-      console.log("[MapCamera][itemsearch][response]", context, abs, meta);
-      docs.forEach((doc, index) => {
-        console.log("[MapCamera][itemsearch][response][doc]", { index, doc });
+      console.log("[MapCamera][itemsearch][response]", context, abs, {
+        ...meta,
+        docsCount: docs.length,
       });
       return;
     }
@@ -228,6 +228,10 @@
           onerror: (err) => reject(err),
           ontimeout: () => reject(new Error("timeout")),
         });
+      });
+      console.log("[MapCamera][docs][posted]", {
+        context,
+        count: docsToPost.length,
       });
     } catch (e) {
       console.warn("[MapCamera][docs][error]", String(e));
