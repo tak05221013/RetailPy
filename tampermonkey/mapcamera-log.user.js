@@ -170,19 +170,24 @@
     }
     if (!Array.isArray(docs) || docs.length === 0) return;
     try {
-      await fetch(DOCS_INGEST_URL, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-api-key": DOCS_INGEST_API_KEY,
-        },
-        body: JSON.stringify({
-          client_ts_ms: Date.now(),
-          page_url: location.href,
-          context,
-          docs,
-        }),
-        keepalive: true,
+      await new Promise((resolve, reject) => {
+        GM_xmlhttpRequest({
+          method: "POST",
+          url: DOCS_INGEST_URL,
+          headers: {
+            "content-type": "application/json",
+            "x-api-key": DOCS_INGEST_API_KEY,
+          },
+          data: JSON.stringify({
+            client_ts_ms: Date.now(),
+            page_url: location.href,
+            context,
+            docs,
+          }),
+          onload: () => resolve(),
+          onerror: (err) => reject(err),
+          ontimeout: () => reject(new Error("timeout")),
+        });
       });
     } catch (e) {
       console.warn("[MapCamera][docs][error]", String(e));
