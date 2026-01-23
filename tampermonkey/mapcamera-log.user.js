@@ -23,6 +23,7 @@
   const DOCS_INGEST_ENABLED = true;
   const DOCS_INGEST_URL = "http://160.251.10.136:8000/mapcamera-search-docs";
   const DOCS_INGEST_API_KEY = "golden";
+  const DOCS_INGEST_GENPIN_KEY = "__mc_genpin_ids_v1";
 
   // ---- Auto reload controls ----
   const ENABLE_AUTO_RELOAD = true;
@@ -63,6 +64,33 @@
     } catch {
       // ignore
     }
+  };
+
+  const loadPostedGenpinIds = () => {
+    try {
+      const raw = sessionStorage.getItem(DOCS_INGEST_GENPIN_KEY);
+      if (!raw) return new Set();
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return new Set();
+      return new Set(parsed.map((value) => String(value)));
+    } catch {
+      return new Set();
+    }
+  };
+
+  const savePostedGenpinIds = (set) => {
+    try {
+      sessionStorage.setItem(DOCS_INGEST_GENPIN_KEY, JSON.stringify(Array.from(set)));
+    } catch {
+      // ignore
+    }
+  };
+
+  const extractGenpinId = (doc) => {
+    if (!doc || typeof doc !== "object") return null;
+    if (doc.genpinId != null) return String(doc.genpinId);
+    if (doc.genpin_id != null) return String(doc.genpin_id);
+    return null;
   };
 
   const truncate = (s) => {
@@ -169,6 +197,18 @@
       return;
     }
     if (!Array.isArray(docs) || docs.length === 0) return;
+    const postedGenpinIds = loadPostedGenpinIds();
+    const docsToPost = docs.filter((doc) => {
+      const genpinId = extractGenpinId(doc);
+      if (!genpinId) return true;
+      return !postedGenpinIds.has(genpinId);
+    });
+    if (docsToPost.length === 0) return;
+    docsToPost.forEach((doc) => {
+      const genpinId = extractGenpinId(doc);
+      if (genpinId) postedGenpinIds.add(genpinId);
+    });
+    savePostedGenpinIds(postedGenpinIds);
     try {
       await new Promise((resolve, reject) => {
         GM_xmlhttpRequest({
@@ -182,7 +222,7 @@
             client_ts_ms: Date.now(),
             page_url: location.href,
             context,
-            docs,
+            docs: docsToPost,
           }),
           onload: () => resolve(),
           onerror: (err) => reject(err),
