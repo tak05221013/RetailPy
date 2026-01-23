@@ -218,38 +218,230 @@ def ingest_docs(payload: DocsIn, x_api_key: str = Header(default="")):
     VALUES
     (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
     ON DUPLICATE KEY UPDATE
-     genpin_name=VALUES(genpin_name),
-     jancode=VALUES(jancode),
-     mapcode=VALUES(mapcode),
-     maker_name_kana=VALUES(maker_name_kana),
-     salesprice=VALUES(salesprice),
-     specialprice=VALUES(specialprice),
-     selltypeid=VALUES(selltypeid),
-     conditionid=VALUES(conditionid),
-     sellstatusid=VALUES(sellstatusid),
-     pricedownflag=VALUES(pricedownflag),
-     recommendflag=VALUES(recommendflag),
-     econlyflag=VALUES(econlyflag),
-     newstockflag=VALUES(newstockflag),
-     limitedflag=VALUES(limitedflag),
-     newproductflag=VALUES(newproductflag),
-     raremodelflag=VALUES(raremodelflag),
-     beginnerflag=VALUES(beginnerflag),
-     businessflag=VALUES(businessflag),
-     reviewcount=VALUES(reviewcount),
-     reviewrating=VALUES(reviewrating),
-     point=VALUES(point),
-     subtitle=VALUES(subtitle),
-     usednum=VALUES(usednum),
-     usedsalespricemin=VALUES(usedsalespricemin),
-     usedsalespointmin=VALUES(usedsalespointmin),
-     accessories=VALUES(accessories),
-     category_name=VALUES(category_name),
-     bestbadgeflag=VALUES(bestbadgeflag),
-     usedconditionrank=VALUES(usedconditionrank),
-     logisticstockdispkbn=VALUES(logisticstockdispkbn),
-     videoflag=VALUES(videoflag),
-     updatetime=VALUES(updatetime)
+     genpin_name=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(genpin_name),
+        genpin_name
+     ),
+     jancode=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(jancode),
+        jancode
+     ),
+     mapcode=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(mapcode),
+        mapcode
+     ),
+     maker_name_kana=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(maker_name_kana),
+        maker_name_kana
+     ),
+     salesprice=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(salesprice),
+        salesprice
+     ),
+     specialprice=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(specialprice),
+        specialprice
+     ),
+     selltypeid=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(selltypeid),
+        selltypeid
+     ),
+     conditionid=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(conditionid),
+        conditionid
+     ),
+     sellstatusid=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(sellstatusid),
+        sellstatusid
+     ),
+     pricedownflag=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(pricedownflag),
+        pricedownflag
+     ),
+     recommendflag=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(recommendflag),
+        recommendflag
+     ),
+     econlyflag=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(econlyflag),
+        econlyflag
+     ),
+     newstockflag=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(newstockflag),
+        newstockflag
+     ),
+     limitedflag=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(limitedflag),
+        limitedflag
+     ),
+     newproductflag=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(newproductflag),
+        newproductflag
+     ),
+     raremodelflag=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(raremodelflag),
+        raremodelflag
+     ),
+     beginnerflag=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(beginnerflag),
+        beginnerflag
+     ),
+     businessflag=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(businessflag),
+        businessflag
+     ),
+     reviewcount=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(reviewcount),
+        reviewcount
+     ),
+     reviewrating=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(reviewrating),
+        reviewrating
+     ),
+     point=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(point),
+        point
+     ),
+     subtitle=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(subtitle),
+        subtitle
+     ),
+     usednum=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(usednum),
+        usednum
+     ),
+     usedsalespricemin=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(usedsalespricemin),
+        usedsalespricemin
+     ),
+     usedsalespointmin=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(usedsalespointmin),
+        usedsalespointmin
+     ),
+     accessories=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(accessories),
+        accessories
+     ),
+     category_name=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(category_name),
+        category_name
+     ),
+     bestbadgeflag=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(bestbadgeflag),
+        bestbadgeflag
+     ),
+     usedconditionrank=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(usedconditionrank),
+        usedconditionrank
+     ),
+     logisticstockdispkbn=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(logisticstockdispkbn),
+        logisticstockdispkbn
+     ),
+     videoflag=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(videoflag),
+        videoflag
+     ),
+     updatetime=IF(
+        NOT (VALUES(jancode) <=> jancode)
+        OR NOT (VALUES(salesprice) <=> salesprice)
+        OR NOT (VALUES(specialprice) <=> specialprice),
+        VALUES(updatetime),
+        updatetime
+     )
     """
 
     try:
