@@ -1,5 +1,6 @@
 import os
 import json
+import time
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, Header, HTTPException
@@ -66,6 +67,49 @@ class LogItem(BaseModel):
 class BatchIn(BaseModel):
     items: List[LogItem]
 
+class MapCameraDoc(BaseModel):
+    genpin_id: int
+    genpin_name: Optional[str] = None
+    jancode: Optional[str] = None
+    mapcode: Optional[str] = None
+    maker_name_kana: Optional[str] = None
+    salesprice: Optional[int] = None
+    specialprice: Optional[int] = None
+    selltypeid: Optional[int] = None
+    conditionid: Optional[int] = None
+    sellstatusid: Optional[int] = None
+    pricedownflag: Optional[int] = None
+    recommendflag: Optional[int] = None
+    econlyflag: Optional[int] = None
+    newstockflag: Optional[int] = None
+    limitedflag: Optional[int] = None
+    newproductflag: Optional[int] = None
+    raremodelflag: Optional[int] = None
+    beginnerflag: Optional[int] = None
+    businessflag: Optional[int] = None
+    reviewcount: Optional[int] = None
+    reviewrating: Optional[float] = None
+    point: Optional[int] = None
+    subtitle: Optional[str] = None
+    usednum: Optional[int] = None
+    usedsalespricemin: Optional[int] = None
+    usedsalespointmin: Optional[int] = None
+    accessories: Optional[str] = None
+    category_name: Optional[str] = None
+    bestbadgeflag: Optional[str] = None
+    usedconditionrank: Optional[str] = None
+    logisticstockdispkbn: Optional[int] = None
+    videoflag: Optional[int] = None
+
+    class Config:
+        extra = "ignore"
+
+class DocsIn(BaseModel):
+    docs: List[MapCameraDoc]
+    client_ts_ms: Optional[int] = None
+    page_url: Optional[str] = None
+    context: Optional[str] = Field(default=None, max_length=16)
+
 @app.get("/health")
 def health():
     return {"ok": True}
@@ -102,6 +146,110 @@ def ingest(payload: BatchIn, x_api_key: str = Header(default="")):
     VALUES
     (%s,%s,%s,%s,%s,%s,%s,%s,%s,
      CAST(%s AS JSON), CAST(%s AS JSON), %s, %s)
+    """
+
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.executemany(sql, rows)
+        return {"inserted": len(rows)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+@app.post("/mapcamera-search-docs")
+def ingest_docs(payload: DocsIn, x_api_key: str = Header(default="")):
+    if not API_KEY or x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not payload.docs:
+        return {"inserted": 0}
+
+    updatetime = payload.client_ts_ms or int(time.time() * 1000)
+    rows = []
+    for doc in payload.docs:
+        rows.append((
+            doc.genpin_id,
+            doc.genpin_name,
+            doc.jancode,
+            doc.mapcode,
+            doc.maker_name_kana,
+            doc.salesprice,
+            doc.specialprice,
+            doc.selltypeid,
+            doc.conditionid,
+            doc.sellstatusid,
+            doc.pricedownflag,
+            doc.recommendflag,
+            doc.econlyflag,
+            doc.newstockflag,
+            doc.limitedflag,
+            doc.newproductflag,
+            doc.raremodelflag,
+            doc.beginnerflag,
+            doc.businessflag,
+            doc.reviewcount,
+            doc.reviewrating,
+            doc.point,
+            doc.subtitle,
+            doc.usednum,
+            doc.usedsalespricemin,
+            doc.usedsalespointmin,
+            doc.accessories,
+            doc.category_name,
+            doc.bestbadgeflag,
+            doc.usedconditionrank,
+            doc.logisticstockdispkbn,
+            doc.videoflag,
+            updatetime,
+        ))
+
+    sql = """
+    INSERT INTO mapcamera_search_docs
+    (genpin_id, genpin_name, jancode, mapcode, maker_name_kana, salesprice, specialprice, selltypeid,
+     conditionid, sellstatusid, pricedownflag, recommendflag, econlyflag, newstockflag, limitedflag,
+     newproductflag, raremodelflag, beginnerflag, businessflag, reviewcount, reviewrating, point,
+     subtitle, usednum, usedsalespricemin, usedsalespointmin, accessories, category_name, bestbadgeflag,
+     usedconditionrank, logisticstockdispkbn, videoflag, updatetime)
+    VALUES
+    (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+    ON DUPLICATE KEY UPDATE
+     genpin_name=VALUES(genpin_name),
+     jancode=VALUES(jancode),
+     mapcode=VALUES(mapcode),
+     maker_name_kana=VALUES(maker_name_kana),
+     salesprice=VALUES(salesprice),
+     specialprice=VALUES(specialprice),
+     selltypeid=VALUES(selltypeid),
+     conditionid=VALUES(conditionid),
+     sellstatusid=VALUES(sellstatusid),
+     pricedownflag=VALUES(pricedownflag),
+     recommendflag=VALUES(recommendflag),
+     econlyflag=VALUES(econlyflag),
+     newstockflag=VALUES(newstockflag),
+     limitedflag=VALUES(limitedflag),
+     newproductflag=VALUES(newproductflag),
+     raremodelflag=VALUES(raremodelflag),
+     beginnerflag=VALUES(beginnerflag),
+     businessflag=VALUES(businessflag),
+     reviewcount=VALUES(reviewcount),
+     reviewrating=VALUES(reviewrating),
+     point=VALUES(point),
+     subtitle=VALUES(subtitle),
+     usednum=VALUES(usednum),
+     usedsalespricemin=VALUES(usedsalespricemin),
+     usedsalespointmin=VALUES(usedsalespointmin),
+     accessories=VALUES(accessories),
+     category_name=VALUES(category_name),
+     bestbadgeflag=VALUES(bestbadgeflag),
+     usedconditionrank=VALUES(usedconditionrank),
+     logisticstockdispkbn=VALUES(logisticstockdispkbn),
+     videoflag=VALUES(videoflag),
+     updatetime=VALUES(updatetime)
     """
 
     try:
