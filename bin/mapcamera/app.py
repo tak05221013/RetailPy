@@ -116,7 +116,7 @@ def health():
 
 @app.post("/ingest")
 def ingest(payload: BatchIn, x_api_key: str = Header(default="")):
-    if not API_KEY or x_api_key != API_KEY:
+    if API_KEY and x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     rows = []
@@ -163,7 +163,7 @@ def ingest(payload: BatchIn, x_api_key: str = Header(default="")):
 
 @app.post("/mapcamera-search-docs")
 def ingest_docs(payload: DocsIn, x_api_key: str = Header(default="")):
-    if not API_KEY or x_api_key != API_KEY:
+    if API_KEY and x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     if not payload.docs:
