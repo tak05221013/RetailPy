@@ -174,33 +174,52 @@
     return value.replace(/\s+/g, " ").trim();
   };
 
-  const pickHeadingSection = (root, headingText) => {
-    if (!root) return null;
+  const pickHeadingSections = (root, headingText) => {
+    if (!root) return [];
     const headings = Array.from(root.querySelectorAll("h3"));
-    const match = headings.find((h3) => normalizeWhitespace(h3.textContent).includes(headingText));
-    if (!match) return null;
-    return match.parentElement || null;
+    return headings
+      .filter((h3) => normalizeWhitespace(h3.textContent).includes(headingText))
+      .map((h3) => h3.parentElement || h3)
+      .filter(Boolean);
   };
 
-  const extractAccessoriesText = (root) => {
-    const section = pickHeadingSection(root, "付属品");
-    if (!section) return null;
-    const paragraph = section.querySelector("p");
-    const raw = paragraph ? paragraph.textContent : section.textContent;
-    const value = normalizeWhitespace(raw).replace(/^付属品\s*/u, "");
-    return value || null;
+  const dedupeTexts = (items) => {
+    const seen = new Set();
+    return items.filter((item) => {
+      if (!item) return false;
+      if (seen.has(item)) return false;
+      seen.add(item);
+      return true;
+    });
   };
 
-  const extractStaffComment = (root) => {
-    if (!root) return null;
-    const marker = Array.from(root.querySelectorAll("b")).find((b) =>
+  const extractAccessoriesTexts = (root) => {
+    const sections = pickHeadingSections(root, "付属品");
+    if (!sections.length) return [];
+    const values = sections
+      .map((section) => {
+        const paragraph = section.querySelector("p");
+        const raw = paragraph ? paragraph.textContent : section.textContent;
+        return normalizeWhitespace(raw).replace(/^付属品\s*/u, "");
+      })
+      .filter((value) => value);
+    return dedupeTexts(values);
+  };
+
+  const extractStaffComments = (root) => {
+    if (!root) return [];
+    const markers = Array.from(root.querySelectorAll("b")).filter((b) =>
       normalizeWhitespace(b.textContent).includes("点検スタッフからのコメント"),
     );
-    if (!marker) return null;
-    const parent = marker.parentElement || marker;
-    const raw = normalizeWhitespace(parent.textContent);
-    const cleaned = raw.replace(/◎?点検スタッフからのコメント\s*/u, "").trim();
-    return cleaned || null;
+    if (!markers.length) return [];
+    const values = markers
+      .map((marker) => {
+        const parent = marker.parentElement || marker;
+        const raw = normalizeWhitespace(parent.textContent);
+        return raw.replace(/◎?点検スタッフからのコメント\s*/u, "").trim();
+      })
+      .filter((value) => value);
+    return dedupeTexts(values);
   };
 
   const extractConditionText = (root) => {
@@ -217,10 +236,14 @@
   const buildDetailDescription = (root) => {
     if (!root) return "";
     const sections = [];
-    const accessories = extractAccessoriesText(root);
-    if (accessories) sections.push(`付属品: ${accessories}`);
-    const comment = extractStaffComment(root);
-    if (comment) sections.push(`点検スタッフからのコメント: ${comment}`);
+    const accessories = extractAccessoriesTexts(root);
+    accessories.forEach((item) => {
+      sections.push(`付属品: ${item}`);
+    });
+    const comments = extractStaffComments(root);
+    comments.forEach((item) => {
+      sections.push(`点検スタッフからのコメント: ${item}`);
+    });
     const condition = extractConditionText(root);
     if (condition) sections.push(`商品コンディション: ${condition}`);
     if (sections.length > 0) {
