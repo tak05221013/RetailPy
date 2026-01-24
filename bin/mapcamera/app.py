@@ -111,6 +111,16 @@ class DocsIn(BaseModel):
     page_url: Optional[str] = None
     context: Optional[str] = Field(default=None, max_length=16)
 
+class DocDetailIn(BaseModel):
+    jan: str = Field(..., max_length=20)
+    genpinId: str = Field(..., max_length=50)
+    price: Optional[int] = None
+    cond: Optional[int] = None
+    dsc: Optional[str] = None
+    unixtime: Optional[int] = None
+    date: Optional[str] = Field(default=None, max_length=10)
+    time: Optional[str] = Field(default=None, max_length=8)
+
 @app.get("/health")
 def health():
     return {"ok": True}
@@ -462,6 +472,50 @@ def ingest_docs(payload: DocsIn, x_api_key: str = Header(default="")):
         with conn.cursor() as cur:
             cur.executemany(sql, rows)
         return {"inserted": len(rows)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+@app.post("/mapcamera-doc-detail")
+def ingest_doc_detail(payload: DocDetailIn, x_api_key: str = Header(default="")):
+    if API_KEY and x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    sql = """
+    INSERT INTO mapproduct_new_desc
+    (jan, genpinId, price, cond, dsc, unixtime, date, time)
+    VALUES
+    (%s,%s,%s,%s,%s,%s,%s,%s)
+    ON DUPLICATE KEY UPDATE
+     price=VALUES(price),
+     cond=VALUES(cond),
+     dsc=VALUES(dsc),
+     unixtime=VALUES(unixtime),
+     date=VALUES(date),
+     time=VALUES(time)
+    """
+
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                sql,
+                (
+                    payload.jan,
+                    payload.genpinId,
+                    payload.price,
+                    payload.cond,
+                    payload.dsc,
+                    payload.unixtime,
+                    payload.date,
+                    payload.time,
+                ),
+            )
+        return {"inserted": 1}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
