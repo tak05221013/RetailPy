@@ -26,7 +26,7 @@
   const DOCS_INGEST_GENPIN_KEY = "__mc_genpin_ids_v1";
   const DOCS_INGEST_DETAIL_CONCURRENCY = 1;
   const DOCS_INGEST_DETAIL_URL = "http://160.251.10.136:8000/mapcamera-doc-detail";
-  const DOCS_INGEST_DETAIL_SELECTOR = "div.infobox.clearfix";
+  const DOCS_INGEST_DETAIL_SELECTOR = "#infobox";
   const DOCS_INGEST_DETAIL_TIMEOUT_MS = 8000;
   const JANCODE_MST_URL = "http://160.251.10.136:8000/mapcamera-jancode-mst";
   const JANCODE_MST_STORAGE_KEY = "__mc_jancode_mst_v1";
