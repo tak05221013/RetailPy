@@ -26,7 +26,7 @@
   const DOCS_INGEST_GENPIN_KEY = "__mc_genpin_ids_v1";
   const DOCS_INGEST_DETAIL_CONCURRENCY = 4;
   const DOCS_INGEST_DETAIL_URL = "http://160.251.10.136:8000/mapcamera-doc-detail";
-  const DOCS_INGEST_DETAIL_SELECTOR = "#infobox";
+  const DOCS_INGEST_DETAIL_SELECTOR = ".infobox.clearfix";
   const DOCS_INGEST_DETAIL_TIMEOUT_MS = 8000;
   const JANCODE_MST_URL = "http://160.251.10.136:8000/mapcamera-jancode-mst";
   const JANCODE_MST_STORAGE_KEY = "__mc_jancode_mst_v1";
@@ -222,6 +222,17 @@
     return dedupeTexts(values);
   };
 
+  const extractDetailKeywordSections = (detailRoot) => {
+    if (!detailRoot) return [];
+    const keywords = ["付属品", "点検スタッフからのコメント"];
+    const values = Array.from(detailRoot.querySelectorAll("*"))
+      .map((el) => normalizeWhitespace(el.textContent))
+      .filter(
+        (text) => text && keywords.some((keyword) => text.includes(keyword)),
+      );
+    return dedupeTexts(values);
+  };
+
   const extractConditionText = (root) => {
     if (!root) return null;
     const row = root.querySelector(".conditionbox .conditionlist tr.focus");
@@ -236,14 +247,21 @@
   const buildDetailDescription = (root) => {
     if (!root) return "";
     const sections = [];
-    const accessories = extractAccessoriesTexts(root);
-    accessories.forEach((item) => {
-      sections.push(`付属品: ${item}`);
-    });
-    const comments = extractStaffComments(root);
-    comments.forEach((item) => {
-      sections.push(`点検スタッフからのコメント: ${item}`);
-    });
+    const keywordSections = extractDetailKeywordSections(root);
+    if (keywordSections.length > 0) {
+      keywordSections.forEach((item) => {
+        sections.push(item);
+      });
+    } else {
+      const accessories = extractAccessoriesTexts(root);
+      accessories.forEach((item) => {
+        sections.push(`付属品: ${item}`);
+      });
+      const comments = extractStaffComments(root);
+      comments.forEach((item) => {
+        sections.push(`点検スタッフからのコメント: ${item}`);
+      });
+    }
     const condition = extractConditionText(root);
     if (condition) sections.push(`商品コンディション: ${condition}`);
     if (sections.length > 0) {
