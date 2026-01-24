@@ -222,14 +222,60 @@
     return dedupeTexts(values);
   };
 
+  const findKeywordContainers = (detailRoot, keywords) => {
+    const containers = Array.from(detailRoot.querySelectorAll("*")).filter(
+      (el) => {
+        const text = normalizeWhitespace(el.textContent);
+        return text && keywords.every((keyword) => text.includes(keyword));
+      },
+    );
+    return containers.filter((container) => {
+      return !Array.from(container.children).some((child) => {
+        const text = normalizeWhitespace(child.textContent);
+        return text && keywords.every((keyword) => text.includes(keyword));
+      });
+    });
+  };
+
+  const findKeywordElements = (container, keyword) => {
+    const elements = Array.from(container.querySelectorAll("*")).filter((el) => {
+      const text = normalizeWhitespace(el.textContent);
+      return text && text.includes(keyword);
+    });
+    return elements.filter((el) => {
+      return !Array.from(el.children).some((child) => {
+        const text = normalizeWhitespace(child.textContent);
+        return text && text.includes(keyword);
+      });
+    });
+  };
+
   const extractDetailKeywordSections = (detailRoot) => {
     if (!detailRoot) return [];
     const keywords = ["付属品", "点検スタッフからのコメント"];
-    const values = Array.from(detailRoot.querySelectorAll("*"))
-      .map((el) => normalizeWhitespace(el.textContent))
-      .filter(
-        (text) => text && keywords.some((keyword) => text.includes(keyword)),
-      );
+    const containers = findKeywordContainers(detailRoot, keywords);
+    if (!containers.length) return [];
+    const values = containers.flatMap((container) => {
+      return keywords.flatMap((keyword) => {
+        const keywordElements = findKeywordElements(container, keyword);
+        return keywordElements
+          .map((keywordEl) => {
+            const siblings = keywordEl.parentElement
+              ? Array.from(keywordEl.parentElement.children).filter(
+                  (el) => el !== keywordEl,
+                )
+              : [];
+            const siblingText = siblings
+              .map((el) => normalizeWhitespace(el.textContent))
+              .filter(Boolean)
+              .join(" ");
+            if (siblingText) return `${keyword}: ${siblingText}`;
+            const raw = normalizeWhitespace(keywordEl.textContent);
+            return raw ? `${keyword}: ${raw.replace(keyword, "").trim()}` : "";
+          })
+          .filter(Boolean);
+      });
+    });
     return dedupeTexts(values);
   };
 
