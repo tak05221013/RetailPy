@@ -174,6 +174,12 @@
     return value.replace(/\s+/g, " ").trim();
   };
 
+  const buildHtmlSnippet = (html, limit = 400) => {
+    if (typeof html !== "string") return "";
+    const slice = html.slice(0, limit);
+    return html.length > limit ? `${slice} ...[truncated ${html.length - limit} chars]` : slice;
+  };
+
   const pickHeadingSections = (root, headingText) => {
     if (!root) return [];
     const headings = Array.from(root.querySelectorAll("h3"));
@@ -313,7 +319,8 @@
     if (sections.length > 0) {
       return sections.join("\n");
     }
-    return normalizeWhitespace(root.textContent);
+    const fallback = normalizeWhitespace(root.textContent);
+    return fallback;
   };
 
   const safeJsonParse = (text) => {
@@ -496,15 +503,39 @@
       });
       const html = await res.text();
       const docDom = new DOMParser().parseFromString(html, "text/html");
-      const detailRoot = docDom.querySelector(DOCS_INGEST_DETAIL_SELECTOR);
+      const detailRoot =
+        docDom.querySelector(DOCS_INGEST_DETAIL_SELECTOR) ??
+        docDom.querySelector("div.infobox.clearfix") ??
+        docDom.querySelector("div.infobox") ??
+        docDom.querySelector(".infobox") ??
+        docDom.body;
       const infoText = buildDetailDescription(detailRoot);
+      const fallbackText = detailRoot ? normalizeWhitespace(detailRoot.textContent) : "";
+      const detailText = infoText || fallbackText;
+      if (!detailRoot) {
+        console.warn("[MapCamera][docs][detail][warn] missing detail root", {
+          context,
+          index,
+          url: condUrl,
+          selector: DOCS_INGEST_DETAIL_SELECTOR,
+          htmlSnippet: buildHtmlSnippet(html),
+        });
+      } else if (!detailText) {
+        console.warn("[MapCamera][docs][detail][warn] empty detail text", {
+          context,
+          index,
+          url: condUrl,
+          selector: DOCS_INGEST_DETAIL_SELECTOR,
+          htmlSnippet: buildHtmlSnippet(html),
+        });
+      }
       return {
         context,
         index,
         url: condUrl,
         status: res.status,
         selector: DOCS_INGEST_DETAIL_SELECTOR,
-        text: infoText,
+        text: detailText,
       };
     } catch (e) {
       const isAbort = e instanceof DOMException && e.name === "AbortError";
