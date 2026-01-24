@@ -169,6 +169,66 @@
     return s.slice(0, MAX_LOG_CHARS) + ` ...[truncated ${s.length - MAX_LOG_CHARS} chars]`;
   };
 
+  const normalizeWhitespace = (value) => {
+    if (typeof value !== "string") return "";
+    return value.replace(/\s+/g, " ").trim();
+  };
+
+  const pickHeadingSection = (root, headingText) => {
+    if (!root) return null;
+    const headings = Array.from(root.querySelectorAll("h3"));
+    const match = headings.find((h3) => normalizeWhitespace(h3.textContent).includes(headingText));
+    if (!match) return null;
+    return match.parentElement || null;
+  };
+
+  const extractAccessoriesText = (root) => {
+    const section = pickHeadingSection(root, "付属品");
+    if (!section) return null;
+    const paragraph = section.querySelector("p");
+    const raw = paragraph ? paragraph.textContent : section.textContent;
+    const value = normalizeWhitespace(raw).replace(/^付属品\s*/u, "");
+    return value || null;
+  };
+
+  const extractStaffComment = (root) => {
+    if (!root) return null;
+    const marker = Array.from(root.querySelectorAll("b")).find((b) =>
+      normalizeWhitespace(b.textContent).includes("点検スタッフからのコメント"),
+    );
+    if (!marker) return null;
+    const parent = marker.parentElement || marker;
+    const raw = normalizeWhitespace(parent.textContent);
+    const cleaned = raw.replace(/◎?点検スタッフからのコメント\s*/u, "").trim();
+    return cleaned || null;
+  };
+
+  const extractConditionText = (root) => {
+    if (!root) return null;
+    const row = root.querySelector(".conditionbox .conditionlist tr.focus");
+    if (!row) return null;
+    const title = normalizeWhitespace(row.querySelector("th")?.textContent);
+    const desc = normalizeWhitespace(row.querySelector("td")?.textContent);
+    if (!title && !desc) return null;
+    if (title && desc) return `${title} - ${desc}`;
+    return title || desc;
+  };
+
+  const buildDetailDescription = (root) => {
+    if (!root) return "";
+    const sections = [];
+    const accessories = extractAccessoriesText(root);
+    if (accessories) sections.push(`付属品: ${accessories}`);
+    const comment = extractStaffComment(root);
+    if (comment) sections.push(`点検スタッフからのコメント: ${comment}`);
+    const condition = extractConditionText(root);
+    if (condition) sections.push(`商品コンディション: ${condition}`);
+    if (sections.length > 0) {
+      return sections.join("\n");
+    }
+    return normalizeWhitespace(root.textContent);
+  };
+
   const safeJsonParse = (text) => {
     try {
       return JSON.parse(text);
@@ -349,7 +409,8 @@
       });
       const html = await res.text();
       const docDom = new DOMParser().parseFromString(html, "text/html");
-      const infoText = docDom.querySelector(DOCS_INGEST_DETAIL_SELECTOR)?.textContent?.trim() ?? "";
+      const detailRoot = docDom.querySelector(DOCS_INGEST_DETAIL_SELECTOR);
+      const infoText = buildDetailDescription(detailRoot);
       return {
         context,
         index,
