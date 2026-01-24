@@ -24,6 +24,7 @@
   const DOCS_INGEST_URL = "http://160.251.10.136:8000/mapcamera-search-docs";
   const DOCS_INGEST_API_KEY = "golden";
   const DOCS_INGEST_GENPIN_KEY = "__mc_genpin_ids_v1";
+  const DOC_DETAIL_FETCH_CONCURRENCY = 1;
 
   // ---- Auto reload controls ----
   const ENABLE_AUTO_RELOAD = true;
@@ -190,6 +191,50 @@
     return { ...meta, body: payload };
   };
 
+  const getDocUrl = (doc) => {
+    if (!doc || typeof doc !== "object") return null;
+    if (typeof doc.url === "string") return doc.url;
+    if (typeof doc.detail_url === "string") return doc.detail_url;
+    if (typeof doc.item_url === "string") return doc.item_url;
+    return null;
+  };
+
+  const runWithConcurrency = async (items, limit, worker) => {
+    const max = Math.max(1, Number.isFinite(limit) ? limit : 1);
+    const queue = Array.from(items);
+    const runners = Array.from({ length: Math.min(max, queue.length) }, async () => {
+      while (queue.length) {
+        const item = queue.shift();
+        if (item === undefined) return;
+        await worker(item);
+      }
+    });
+    await Promise.all(runners);
+  };
+
+  const logDocDetailForCond = async (doc, context) => {
+    try {
+      if (!doc || typeof doc !== "object") return;
+      if (Number(doc.cond) !== 7) return;
+      const url = toAbsoluteUrl(getDocUrl(doc));
+      if (!url) return;
+      const res = await fetch(url, { credentials: "include" });
+      const html = await res.text();
+      const parsed = new DOMParser().parseFromString(html, "text/html");
+      const text = parsed.querySelector("div.infobox.clearfix")?.textContent?.trim() ?? "";
+      console.log("[MapCamera][docs][cond7][infobox]", { context, url, text });
+    } catch (e) {
+      console.warn("[MapCamera][docs][cond7][error]", { context, error: String(e) });
+    }
+  };
+
+  const logDocsBeforePost = async (docs, context) => {
+    if (!Array.isArray(docs) || docs.length === 0) return;
+    await runWithConcurrency(docs, DOC_DETAIL_FETCH_CONCURRENCY, async (doc) => {
+      await logDocDetailForCond(doc, context);
+    });
+  };
+
   const postDocs = async (docs, context) => {
     if (!DOCS_INGEST_ENABLED) return;
     if (!DOCS_INGEST_API_KEY) {
@@ -204,6 +249,7 @@
       return !postedGenpinIds.has(genpinId);
     });
     if (docsToPost.length === 0) return;
+    await logDocsBeforePost(docsToPost, context);
     docsToPost.forEach((doc) => {
       const genpinId = extractGenpinId(doc);
       if (genpinId) postedGenpinIds.add(genpinId);
