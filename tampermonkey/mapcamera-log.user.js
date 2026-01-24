@@ -180,6 +180,8 @@
     return html.length > limit ? `${slice} ...[truncated ${html.length - limit} chars]` : slice;
   };
 
+  const DETAIL_REQUIRED_KEYWORDS = ["付属品", "点検スタッフからのコメント"];
+
   const pickHeadingSections = (root, headingText) => {
     if (!root) return [];
     const headings = Array.from(root.querySelectorAll("h3"));
@@ -321,6 +323,16 @@
     }
     const fallback = normalizeWhitespace(root.textContent);
     return fallback;
+  };
+
+  const findDetailBlocks = (docDom) => {
+    if (!docDom) return [];
+    const blocks = Array.from(docDom.querySelectorAll(DOCS_INGEST_DETAIL_SELECTOR));
+    if (!blocks.length) return [];
+    return blocks.filter((block) => {
+      const text = normalizeWhitespace(block.textContent);
+      return text && DETAIL_REQUIRED_KEYWORDS.every((keyword) => text.includes(keyword));
+    });
   };
 
   const safeJsonParse = (text) => {
@@ -503,16 +515,20 @@
       });
       const html = await res.text();
       const docDom = new DOMParser().parseFromString(html, "text/html");
-      const detailRoot =
-        docDom.querySelector(DOCS_INGEST_DETAIL_SELECTOR) ??
+      const matchedBlocks = findDetailBlocks(docDom);
+      const fallbackRoot =
         docDom.querySelector("div.infobox.clearfix") ??
         docDom.querySelector("div.infobox") ??
         docDom.querySelector(".infobox") ??
         docDom.body;
-      const infoText = buildDetailDescription(detailRoot);
-      const fallbackText = detailRoot ? normalizeWhitespace(detailRoot.textContent) : "";
-      const detailText = infoText || fallbackText;
-      if (!detailRoot) {
+      const detailRoots = matchedBlocks.length > 0 ? matchedBlocks : [fallbackRoot].filter(Boolean);
+      const detailDescriptions = detailRoots
+        .map((root) => buildDetailDescription(root))
+        .filter((value) => value);
+      const detailText =
+        detailDescriptions.join("\n") ||
+        (detailRoots[0] ? normalizeWhitespace(detailRoots[0].textContent) : "");
+      if (detailRoots.length === 0) {
         console.warn("[MapCamera][docs][detail][warn] missing detail root", {
           context,
           index,
