@@ -25,6 +25,7 @@
   const DOCS_INGEST_API_KEY = "golden";
   const DOCS_INGEST_GENPIN_KEY = "__mc_genpin_ids_v1";
   const DOCS_INGEST_DETAIL_CONCURRENCY = 1;
+  const DOCS_INGEST_DETAIL_URL = "http://160.251.10.136:8000/mapcamera-doc-detail";
   const DOCS_INGEST_DETAIL_SELECTOR = "div.infobox.clearfix";
   const DOCS_INGEST_DETAIL_TIMEOUT_MS = 8000;
   const JANCODE_MST_URL = "http://160.251.10.136:8000/mapcamera-jancode-mst";
@@ -109,11 +110,57 @@
     }
   };
 
+  const getJancodeMasterPrice = (mst, janCode) => {
+    if (!mst || !janCode) return null;
+    const prices = mst?.prices ?? mst?.price ?? mst;
+    if (!prices || typeof prices !== "object") return null;
+    const raw = prices[janCode];
+    return numberOrNull(raw);
+  };
+
   const extractGenpinId = (doc) => {
     if (!doc || typeof doc !== "object") return null;
     if (doc.genpinId != null) return String(doc.genpinId);
     if (doc.genpin_id != null) return String(doc.genpin_id);
     return null;
+  };
+
+  const extractJanCode = (doc) => {
+    if (!doc || typeof doc !== "object") return null;
+    const raw = doc.jancode ?? doc.janCode ?? doc.jan_code ?? doc.jan;
+    if (raw == null) return null;
+    const value = String(raw).trim();
+    return value ? value : null;
+  };
+
+  const extractCond = (doc) => {
+    if (!doc || typeof doc !== "object") return null;
+    const raw = doc.conditionid ?? doc.conditionId ?? doc.cond ?? doc.condition;
+    const cond = Number(raw);
+    return Number.isFinite(cond) ? cond : null;
+  };
+
+  const numberOrNull = (value) => {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+  };
+
+  const calculateDocPrice = (doc) => {
+    const specialprice = numberOrNull(doc?.specialprice) ?? 0;
+    const salesprice = numberOrNull(doc?.salesprice) ?? 0;
+    if (specialprice !== 0) {
+      return Math.trunc(specialprice + specialprice * 0.1);
+    }
+    if (salesprice === 0) return null;
+    return Math.trunc(salesprice + salesprice * 0.1);
+  };
+
+  const buildDetailTimestamp = () => {
+    const nowTs = Date.now();
+    const nowDate = new Date(nowTs);
+    const date = nowDate.toISOString().slice(0, 10);
+    const time = nowDate.toTimeString().slice(0, 8);
+    return { unixtime: nowTs, date, time };
   };
 
   const truncate = (s) => {
@@ -281,16 +328,16 @@
     await Promise.all(workers);
   };
 
-  const logDocDetailInfo = async (doc, index, context) => {
+  const fetchDocDetailInfo = async (doc, index, context) => {
     const rawUrl = extractDocUrl(doc);
     if (!rawUrl) {
       console.warn("[MapCamera][docs][detail][skip] missing url", { context, index });
-      return;
+      return null;
     }
     const condUrl = buildCond7Url(rawUrl);
     if (!condUrl) {
       console.warn("[MapCamera][docs][detail][skip] invalid url", { context, index, rawUrl });
-      return;
+      return null;
     }
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), DOCS_INGEST_DETAIL_TIMEOUT_MS);
@@ -303,14 +350,14 @@
       const html = await res.text();
       const docDom = new DOMParser().parseFromString(html, "text/html");
       const infoText = docDom.querySelector(DOCS_INGEST_DETAIL_SELECTOR)?.textContent?.trim() ?? "";
-      console.log("[MapCamera][docs][detail]", {
+      return {
         context,
         index,
         url: condUrl,
         status: res.status,
         selector: DOCS_INGEST_DETAIL_SELECTOR,
         text: infoText,
-      });
+      };
     } catch (e) {
       const isAbort = e instanceof DOMException && e.name === "AbortError";
       console.warn(
@@ -323,15 +370,10 @@
           timeoutMs: isAbort ? DOCS_INGEST_DETAIL_TIMEOUT_MS : undefined,
         },
       );
+      return null;
     } finally {
       clearTimeout(timeoutId);
     }
-  };
-
-  const fetchDocDetails = async (docs, context) => {
-    await runWithConcurrency(docs, DOCS_INGEST_DETAIL_CONCURRENCY, async (doc, index) => {
-      await logDocDetailInfo(doc, index, context);
-    });
   };
 
   const postDocs = async (docs, context) => {
@@ -354,7 +396,6 @@
     });
     savePostedGenpinIds(postedGenpinIds);
     try {
-      await fetchDocDetails(docsToPost, context);
       await new Promise((resolve, reject) => {
         GM_xmlhttpRequest({
           method: "POST",
@@ -381,6 +422,75 @@
     } catch (e) {
       console.warn("[MapCamera][docs][error]", String(e));
     }
+  };
+
+  const postDocDetail = async (detail) => {
+    if (!DOCS_INGEST_ENABLED) return false;
+    if (!DOCS_INGEST_API_KEY) {
+      console.warn("[MapCamera][detail][skip] missing DOCS_INGEST_API_KEY");
+      return false;
+    }
+    try {
+      await new Promise((resolve, reject) => {
+        GM_xmlhttpRequest({
+          method: "POST",
+          url: DOCS_INGEST_DETAIL_URL,
+          headers: {
+            "content-type": "application/json",
+            "x-api-key": DOCS_INGEST_API_KEY,
+          },
+          data: JSON.stringify(detail),
+          onload: (response) => {
+            if (response.status < 200 || response.status >= 300) {
+              reject(new Error(`status ${response.status}`));
+              return;
+            }
+            resolve();
+          },
+          onerror: (err) => reject(err),
+          ontimeout: () => reject(new Error("timeout")),
+        });
+      });
+      return true;
+    } catch (e) {
+      console.warn("[MapCamera][detail][error]", String(e));
+      return false;
+    }
+  };
+
+  const postCond7DocsWithDetail = async (docs, context) => {
+    await runWithConcurrency(docs, DOCS_INGEST_DETAIL_CONCURRENCY, async (doc, index) => {
+      const detailInfo = await fetchDocDetailInfo(doc, index, context);
+      if (!detailInfo) return;
+      const janCode = extractJanCode(doc);
+      const genpinId = extractGenpinId(doc);
+      const cond = extractCond(doc);
+      const price = calculateDocPrice(doc);
+      if (!janCode || !genpinId || price == null || cond == null) {
+        console.warn("[MapCamera][detail][skip] missing required fields", {
+          context,
+          index,
+          janCode,
+          genpinId,
+          cond,
+          price,
+        });
+        return;
+      }
+      const timestamp = buildDetailTimestamp();
+      const detailPayload = {
+        jan: janCode,
+        genpinId,
+        price,
+        cond,
+        dsc: detailInfo.text,
+        ...timestamp,
+      };
+      const detailPosted = await postDocDetail(detailPayload);
+      if (detailPosted) {
+        await postDocs([doc], context);
+      }
+    });
   };
 
   const downloadJancodeMst = async () => {
@@ -428,6 +538,50 @@
     const existing = loadJancodeMst();
     if (existing) return;
     void downloadJancodeMst();
+  };
+
+  const getJancodeMst = async () => {
+    const existing = loadJancodeMst();
+    if (existing) return existing;
+    return await downloadJancodeMst();
+  };
+
+  const filterDocsByPrice = (docs, jancodeMst) => {
+    const cond7Docs = [];
+    const otherDocs = [];
+    docs.forEach((doc) => {
+      const janCode = extractJanCode(doc);
+      if (!janCode) return;
+      const masterPrice = getJancodeMasterPrice(jancodeMst, janCode);
+      if (masterPrice == null) return;
+      const price = calculateDocPrice(doc);
+      if (price == null) return;
+      const margin = masterPrice - (masterPrice * 0.1 + 1434 + price);
+      if (margin < 3000) return;
+      const cond = extractCond(doc);
+      if (cond === 7) {
+        cond7Docs.push(doc);
+      } else {
+        otherDocs.push(doc);
+      }
+    });
+    return { cond7Docs, otherDocs };
+  };
+
+  const handleDocs = async (docs, context) => {
+    if (!docs || docs.length === 0) return;
+    const jancodeMst = await getJancodeMst();
+    if (!jancodeMst) {
+      console.warn("[MapCamera][docs][skip] missing jancode mst");
+      return;
+    }
+    const { cond7Docs, otherDocs } = filterDocsByPrice(docs, jancodeMst);
+    if (otherDocs.length > 0) {
+      await postDocs(otherDocs, context);
+    }
+    if (cond7Docs.length > 0) {
+      await postCond7DocsWithDetail(cond7Docs, context);
+    }
   };
 
   // ---- Auto reload trigger: "first response in this page load" ----
@@ -502,7 +656,7 @@
           logResponse(url, "fetch", buildResponseInfo(data, { status: res.status, contentType: ct }));
           const docs = pickDocs(data);
           if (docs) {
-            void postDocs(docs, "fetch");
+            void handleDocs(docs, "fetch");
           }
         } else {
           const text = await clone.text();
@@ -514,7 +668,7 @@
           );
           const docs = pickDocs(parsed);
           if (docs) {
-            void postDocs(docs, "fetch");
+            void handleDocs(docs, "fetch");
           }
         }
 
@@ -578,7 +732,7 @@
             );
             const docs = pickDocs(parsed);
             if (docs) {
-              void postDocs(docs, "xhr");
+              void handleDocs(docs, "xhr");
             }
           } else if (this.responseType === "json") {
             logResponse(
@@ -588,7 +742,7 @@
             );
             const docs = pickDocs(this.response);
             if (docs) {
-              void postDocs(docs, "xhr");
+              void handleDocs(docs, "xhr");
             }
           } else if (this.responseType === "arraybuffer") {
             const ab = this.response;
