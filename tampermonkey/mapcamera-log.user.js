@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MapCamera ItemSearch Request+Response Logger + Auto Reload
 // @namespace    https://www.mapcamera.com/
-// @version      1.4.0
+// @version      1.5.0
 // @description  Log request/response for MapCamera itemsearch API calls and auto-reload after first response
 // @match        https://www.mapcamera.com/*
 // @run-at       document-start
@@ -24,6 +24,8 @@
   const DOCS_INGEST_URL = "http://160.251.10.136:8000/mapcamera-search-docs";
   const DOCS_INGEST_API_KEY = "golden";
   const DOCS_INGEST_GENPIN_KEY = "__mc_genpin_ids_v1";
+  const DOCS_INGEST_DETAIL_CONCURRENCY = 1;
+  const DOCS_INGEST_DETAIL_SELECTOR = "div.infobox.clearfix";
 
   // ---- Auto reload controls ----
   const ENABLE_AUTO_RELOAD = true;
@@ -190,6 +192,88 @@
     return { ...meta, body: payload };
   };
 
+  const DOC_URL_FIELDS = [
+    "url",
+    "item_url",
+    "itemUrl",
+    "detail_url",
+    "detailUrl",
+    "link",
+    "href",
+    "itemLink",
+    "page_url",
+    "pageUrl",
+  ];
+
+  const extractDocUrl = (doc) => {
+    if (!doc || typeof doc !== "object") return null;
+    for (const field of DOC_URL_FIELDS) {
+      const value = doc[field];
+      if (typeof value === "string" && value.trim()) return value.trim();
+    }
+    return null;
+  };
+
+  const buildCond7Url = (url) => {
+    const abs = toAbsoluteUrl(url);
+    if (!abs) return null;
+    const u = new URL(abs);
+    u.searchParams.set("cond", "7");
+    return u.href;
+  };
+
+  const runWithConcurrency = async (items, limit, handler) => {
+    const total = Array.isArray(items) ? items.length : 0;
+    if (!total) return;
+    const concurrency = Math.max(1, Number(limit) || 1);
+    let cursor = 0;
+    const workers = Array.from({ length: Math.min(concurrency, total) }, async () => {
+      while (cursor < total) {
+        const index = cursor++;
+        await handler(items[index], index);
+      }
+    });
+    await Promise.all(workers);
+  };
+
+  const logDocDetailInfo = async (doc, index, context) => {
+    const rawUrl = extractDocUrl(doc);
+    if (!rawUrl) {
+      console.warn("[MapCamera][docs][detail][skip] missing url", { context, index });
+      return;
+    }
+    const condUrl = buildCond7Url(rawUrl);
+    if (!condUrl) {
+      console.warn("[MapCamera][docs][detail][skip] invalid url", { context, index, rawUrl });
+      return;
+    }
+    try {
+      const res = await originalFetch(condUrl, {
+        credentials: "include",
+        cache: "no-store",
+      });
+      const html = await res.text();
+      const docDom = new DOMParser().parseFromString(html, "text/html");
+      const infoText = docDom.querySelector(DOCS_INGEST_DETAIL_SELECTOR)?.textContent?.trim() ?? "";
+      console.log("[MapCamera][docs][detail]", {
+        context,
+        index,
+        url: condUrl,
+        status: res.status,
+        selector: DOCS_INGEST_DETAIL_SELECTOR,
+        text: infoText,
+      });
+    } catch (e) {
+      console.warn("[MapCamera][docs][detail][error]", { context, index, url: condUrl, error: String(e) });
+    }
+  };
+
+  const fetchDocDetails = async (docs, context) => {
+    await runWithConcurrency(docs, DOCS_INGEST_DETAIL_CONCURRENCY, async (doc, index) => {
+      await logDocDetailInfo(doc, index, context);
+    });
+  };
+
   const postDocs = async (docs, context) => {
     if (!DOCS_INGEST_ENABLED) return;
     if (!DOCS_INGEST_API_KEY) {
@@ -210,6 +294,7 @@
     });
     savePostedGenpinIds(postedGenpinIds);
     try {
+      await fetchDocDetails(docsToPost, context);
       await new Promise((resolve, reject) => {
         GM_xmlhttpRequest({
           method: "POST",
