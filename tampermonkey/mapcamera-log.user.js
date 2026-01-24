@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MapCamera ItemSearch Request+Response Logger + Auto Reload
 // @namespace    https://www.mapcamera.com/
-// @version      1.5.0
+// @version      1.5.1
 // @description  Log request/response for MapCamera itemsearch API calls and auto-reload after first response
 // @match        https://www.mapcamera.com/*
 // @run-at       document-start
@@ -26,6 +26,8 @@
   const DOCS_INGEST_GENPIN_KEY = "__mc_genpin_ids_v1";
   const DOCS_INGEST_DETAIL_CONCURRENCY = 1;
   const DOCS_INGEST_DETAIL_SELECTOR = "div.infobox.clearfix";
+  const JANCODE_MST_URL = "http://160.251.10.136:8000/mapcamera-jancode-mst";
+  const JANCODE_MST_STORAGE_KEY = "__mc_jancode_mst_v1";
 
   // ---- Auto reload controls ----
   const ENABLE_AUTO_RELOAD = true;
@@ -83,6 +85,24 @@
   const savePostedGenpinIds = (set) => {
     try {
       sessionStorage.setItem(DOCS_INGEST_GENPIN_KEY, JSON.stringify(Array.from(set)));
+    } catch {
+      // ignore
+    }
+  };
+
+  const loadJancodeMst = () => {
+    try {
+      const raw = sessionStorage.getItem(JANCODE_MST_STORAGE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  };
+
+  const saveJancodeMst = (data) => {
+    try {
+      sessionStorage.setItem(JANCODE_MST_STORAGE_KEY, JSON.stringify(data));
     } catch {
       // ignore
     }
@@ -347,6 +367,53 @@
     }
   };
 
+  const downloadJancodeMst = async () => {
+    if (!DOCS_INGEST_API_KEY) {
+      console.warn("[MapCamera][jancode][skip] missing DOCS_INGEST_API_KEY");
+      return null;
+    }
+    try {
+      const data = await new Promise((resolve, reject) => {
+        GM_xmlhttpRequest({
+          method: "GET",
+          url: JANCODE_MST_URL,
+          headers: {
+            "x-api-key": DOCS_INGEST_API_KEY,
+          },
+          onload: (response) => {
+            if (response.status < 200 || response.status >= 300) {
+              reject(new Error(`status ${response.status}`));
+              return;
+            }
+            const parsed = safeJsonParse(response.responseText);
+            if (!parsed) {
+              reject(new Error("invalid json"));
+              return;
+            }
+            resolve(parsed);
+          },
+          onerror: (err) => reject(err),
+          ontimeout: () => reject(new Error("timeout")),
+        });
+      });
+      saveJancodeMst(data);
+      console.log("[MapCamera][jancode][downloaded]", {
+        updated_at: data?.updated_at,
+        pricesCount: data?.prices ? Object.keys(data.prices).length : 0,
+      });
+      return data;
+    } catch (e) {
+      console.warn("[MapCamera][jancode][error]", String(e));
+      return null;
+    }
+  };
+
+  const ensureJancodeMst = () => {
+    const existing = loadJancodeMst();
+    if (existing) return;
+    void downloadJancodeMst();
+  };
+
   // ---- Auto reload trigger: "first response in this page load" ----
   let reloadScheduledThisPage = false;
 
@@ -560,4 +627,5 @@
     MIN_RELOAD_INTERVAL_MS,
     MAX_RELOADS_PER_TAB,
   });
+  ensureJancodeMst();
 })();

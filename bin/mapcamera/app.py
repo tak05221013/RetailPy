@@ -13,6 +13,7 @@ MYSQL_PORT = int(os.environ.get("MC_MYSQL_PORT", "3306"))
 MYSQL_USER = os.environ.get("MC_MYSQL_USER", "retail")
 MYSQL_PASS = os.environ.get("MC_MYSQL_PASS", "retailre2021")
 MYSQL_DB   = os.environ.get("MC_MYSQL_DB", "retail")
+JANCODE_MST_PATH = os.environ.get("MC_JANCODE_MST_PATH", "/home/retail/mst/map.jancode.mst")
 
 app = FastAPI(title="MapCamera Log Ingest")
 
@@ -113,6 +114,18 @@ class DocsIn(BaseModel):
 @app.get("/health")
 def health():
     return {"ok": True}
+
+@app.get("/mapcamera-jancode-mst")
+def get_jancode_mst(x_api_key: str = Header(default="")):
+    if API_KEY and x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    try:
+        with open(JANCODE_MST_PATH, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="jancode mst not found") from exc
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=500, detail="invalid jancode mst json") from exc
 
 @app.post("/ingest")
 def ingest(payload: BatchIn, x_api_key: str = Header(default="")):
