@@ -26,6 +26,7 @@
   const DOCS_INGEST_GENPIN_KEY = "__mc_genpin_ids_v1";
   const DOCS_INGEST_DETAIL_CONCURRENCY = 1;
   const DOCS_INGEST_DETAIL_SELECTOR = "div.infobox.clearfix";
+  const DOCS_INGEST_DETAIL_TIMEOUT_MS = 8000;
   const JANCODE_MST_URL = "http://160.251.10.136:8000/mapcamera-jancode-mst";
   const JANCODE_MST_STORAGE_KEY = "__mc_jancode_mst_v1";
 
@@ -291,10 +292,13 @@
       console.warn("[MapCamera][docs][detail][skip] invalid url", { context, index, rawUrl });
       return;
     }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), DOCS_INGEST_DETAIL_TIMEOUT_MS);
     try {
       const res = await originalFetch(condUrl, {
         credentials: "include",
         cache: "no-store",
+        signal: controller.signal,
       });
       const html = await res.text();
       const docDom = new DOMParser().parseFromString(html, "text/html");
@@ -308,7 +312,19 @@
         text: infoText,
       });
     } catch (e) {
-      console.warn("[MapCamera][docs][detail][error]", { context, index, url: condUrl, error: String(e) });
+      const isAbort = e instanceof DOMException && e.name === "AbortError";
+      console.warn(
+        isAbort ? "[MapCamera][docs][detail][timeout]" : "[MapCamera][docs][detail][error]",
+        {
+          context,
+          index,
+          url: condUrl,
+          error: String(e),
+          timeoutMs: isAbort ? DOCS_INGEST_DETAIL_TIMEOUT_MS : undefined,
+        },
+      );
+    } finally {
+      clearTimeout(timeoutId);
     }
   };
 
