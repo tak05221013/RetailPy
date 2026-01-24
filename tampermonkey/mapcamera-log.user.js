@@ -205,12 +205,36 @@
     "pageUrl",
   ];
 
+  const DOC_MAPCODE_FIELDS = [
+    "mapcode",
+    "map_code",
+    "mapCode",
+  ];
+
+  const buildItemUrlFromMapcode = (mapcode) => {
+    if (typeof mapcode !== "string") return null;
+    const trimmed = mapcode.trim();
+    if (!trimmed) return null;
+    return `https://www.mapcamera.com/item/${trimmed}`;
+  };
+
+  const extractDocMapcode = (doc) => {
+    if (!doc || typeof doc !== "object") return null;
+    for (const field of DOC_MAPCODE_FIELDS) {
+      const value = doc[field];
+      if (typeof value === "string" && value.trim()) return value.trim();
+    }
+    return null;
+  };
+
   const extractDocUrl = (doc) => {
     if (!doc || typeof doc !== "object") return null;
     for (const field of DOC_URL_FIELDS) {
       const value = doc[field];
       if (typeof value === "string" && value.trim()) return value.trim();
     }
+    const mapcode = extractDocMapcode(doc);
+    if (mapcode) return buildItemUrlFromMapcode(mapcode);
     return null;
   };
 
