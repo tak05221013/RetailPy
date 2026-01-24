@@ -24,7 +24,7 @@
   const DOCS_INGEST_URL = "http://160.251.10.136:8000/mapcamera-search-docs";
   const DOCS_INGEST_API_KEY = "golden";
   const DOCS_INGEST_GENPIN_KEY = "__mc_genpin_ids_v1";
-  const DOCS_INGEST_DETAIL_CONCURRENCY = 1;
+  const DOCS_INGEST_DETAIL_CONCURRENCY = 4;
   const DOCS_INGEST_DETAIL_URL = "http://160.251.10.136:8000/mapcamera-doc-detail";
   const DOCS_INGEST_DETAIL_SELECTOR = "#infobox";
   const DOCS_INGEST_DETAIL_TIMEOUT_MS = 8000;
@@ -35,10 +35,10 @@
   const ENABLE_AUTO_RELOAD = true;
 
   // 「最初のレスポンスをログしたら」何秒後にリロードするか
-  const RELOAD_DELAY_MS = 1000;
+  const RELOAD_DELAY_MS = 30000;
 
   // リロードの最短間隔（短すぎると負荷＆制限の原因になりやすい）
-  const MIN_RELOAD_INTERVAL_MS = 1000;
+  const MIN_RELOAD_INTERVAL_MS = 30000;
 
   // 同一タブで最大何回までリロードするか（無限ループ防止）
   const MAX_RELOADS_PER_TAB = 10000;
