@@ -34,10 +34,10 @@
   const MIN_RELOAD_INTERVAL_MS = 1000;
 
   // ログがこない場合に強制リロードするまでの待ち時間（ウォッチドッグ）
-  const FORCE_RELOAD_TIMEOUT_MS = 60000;
+  const FORCE_RELOAD_TIMEOUT_MS = 10000;
 
   // 同一タブで最大何回までリロードするか（無限ループ防止）
-  const MAX_RELOADS_PER_TAB = 10000;
+  const MAX_RELOADS_PER_TAB = 100000;
 
   // タブが裏にあるときはリロードしない（任意）
   const RELOAD_ONLY_WHEN_VISIBLE = false;
