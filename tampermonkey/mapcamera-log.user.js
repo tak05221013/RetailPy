@@ -33,6 +33,9 @@
   // リロードの最短間隔（短すぎると負荷＆制限の原因になりやすい）
   const MIN_RELOAD_INTERVAL_MS = 1000;
 
+  // ログがこない場合に強制リロードするまでの待ち時間（ウォッチドッグ）
+  const FORCE_RELOAD_TIMEOUT_MS = 60000;
+
   // 同一タブで最大何回までリロードするか（無限ループ防止）
   const MAX_RELOADS_PER_TAB = 10000;
 
@@ -243,6 +246,29 @@
 
   // ---- Auto reload trigger: "first response in this page load" ----
   let reloadScheduledThisPage = false;
+  let watchdogId = null;
+
+  const scheduleWatchdog = () => {
+    if (!ENABLE_AUTO_RELOAD) return;
+    if (!Number.isFinite(FORCE_RELOAD_TIMEOUT_MS) || FORCE_RELOAD_TIMEOUT_MS <= 0) return;
+
+    const arm = () => {
+      if (reloadScheduledThisPage) return;
+
+      if (RELOAD_ONLY_WHEN_VISIBLE && document.visibilityState !== "visible") {
+        console.log("[MapCamera][auto-reload] watchdog fired (tab not visible); deferring");
+        watchdogId = setTimeout(arm, FORCE_RELOAD_TIMEOUT_MS);
+        return;
+      }
+
+      console.log("[MapCamera][auto-reload] watchdog fired; reloading now", {
+        timeoutMs: FORCE_RELOAD_TIMEOUT_MS,
+      });
+      location.reload();
+    };
+
+    watchdogId = setTimeout(arm, FORCE_RELOAD_TIMEOUT_MS);
+  };
 
   const scheduleReloadOnce = (reason) => {
     if (!ENABLE_AUTO_RELOAD) return;
@@ -271,6 +297,10 @@
     }
 
     reloadScheduledThisPage = true;
+    if (watchdogId !== null) {
+      clearTimeout(watchdogId);
+      watchdogId = null;
+    }
 
     console.log("[MapCamera][auto-reload] scheduled", { reason, inMs: RELOAD_DELAY_MS });
 
@@ -451,7 +481,10 @@
   console.log("[MapCamera] logger+auto-reload loaded", {
     ENABLE_AUTO_RELOAD,
     RELOAD_DELAY_MS,
+    FORCE_RELOAD_TIMEOUT_MS,
     MIN_RELOAD_INTERVAL_MS,
     MAX_RELOADS_PER_TAB,
   });
+
+  scheduleWatchdog();
 })();
