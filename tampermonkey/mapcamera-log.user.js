@@ -28,10 +28,10 @@
   const ENABLE_AUTO_RELOAD = true;
 
   // 「最初のレスポンスをログしたら」何秒後にリロードするか
-  const RELOAD_DELAY_MS = 30000;
+  const RELOAD_DELAY_MS = 1000;
 
   // リロードの最短間隔（短すぎると負荷＆制限の原因になりやすい）
-  const MIN_RELOAD_INTERVAL_MS = 30000;
+  const MIN_RELOAD_INTERVAL_MS = 2000;
 
   // 同一タブで最大何回までリロードするか（無限ループ防止）
   const MAX_RELOADS_PER_TAB = 10000;
