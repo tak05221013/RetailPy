@@ -6,7 +6,7 @@
 // @match        https://www.mapcamera.com/*
 // @run-at       document-start
 // @grant GM_xmlhttpRequest
-// @connect 160.251.10.136
+// @connect camiira.com
 // ==/UserScript==
 
 (() => {
@@ -21,7 +21,7 @@
 
   // ---- Docs ingest ----
   const DOCS_INGEST_ENABLED = true;
-  const DOCS_INGEST_URL = "http://160.251.10.136:8000/mapcamera-search-docs";
+  const DOCS_INGEST_URL = "http://camiira.com:8000/mapcamera-search-docs";
   const DOCS_INGEST_API_KEY = "golden";
   const DOCS_INGEST_GENPIN_KEY = "__mc_genpin_ids_v1";
   // ---- Auto reload controls ----
