@@ -6,7 +6,7 @@
 // @match        https://www.mapcamera.com/*
 // @run-at       document-start
 // @grant GM_xmlhttpRequest
-// @connect camiira.com
+// @connect camiiira.com
 // ==/UserScript==
 
 (() => {
