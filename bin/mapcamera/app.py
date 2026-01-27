@@ -27,6 +27,11 @@ basic_security = HTTPBasic()
 
 app = FastAPI(title="MapCamera Log Ingest")
 
+@app.get("/")
+def root():
+    return {"ok": True}
+
+
 ASIN_FORM_HTML = """
 <!DOCTYPE html>
 <html lang="ja">
