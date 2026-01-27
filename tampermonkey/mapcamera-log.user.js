@@ -21,7 +21,7 @@
 
   // ---- Docs ingest ----
   const DOCS_INGEST_ENABLED = true;
-  const DOCS_INGEST_URL = "http://camiira.com:8000/mapcamera-search-docs";
+  const DOCS_INGEST_URL = "http://camiira.com/mapcamera-search-docs";
   const DOCS_INGEST_API_KEY = "golden";
   const DOCS_INGEST_GENPIN_KEY = "__mc_genpin_ids_v1";
   // ---- Auto reload controls ----
