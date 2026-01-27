@@ -3,7 +3,8 @@ import json
 import time
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Form, Header, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 import pymysql
 
@@ -16,6 +17,116 @@ MYSQL_DB   = os.environ.get("MC_MYSQL_DB", "retail")
 JANCODE_MST_PATH = os.environ.get("MC_JANCODE_MST_PATH", "/home/retail/mst/map.jancode.mst")
 
 app = FastAPI(title="MapCamera Log Ingest")
+
+ASIN_FORM_HTML = """
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ASIN 登録</title>
+    <style>
+      body {
+        font-family: "Helvetica Neue", Arial, sans-serif;
+        background: #f6f7fb;
+        margin: 0;
+        padding: 40px 16px;
+        color: #1f2937;
+      }
+      .card {
+        max-width: 480px;
+        margin: 0 auto;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+        padding: 32px;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 20px;
+      }
+      label {
+        display: block;
+        font-size: 14px;
+        margin-bottom: 8px;
+      }
+      input[type="text"] {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 8px;
+        border: 1px solid #d1d5db;
+        font-size: 16px;
+      }
+      button {
+        margin-top: 16px;
+        background: #2563eb;
+        color: #fff;
+        border: none;
+        padding: 12px 18px;
+        border-radius: 8px;
+        font-size: 15px;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      #status {
+        margin-top: 16px;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>ASIN 登録フォーム</h1>
+      <form id="asin-form">
+        <label for="asin">ASIN (10 文字)</label>
+        <input id="asin" name="asin" type="text" maxlength="10" required />
+        <button type="submit">登録</button>
+      </form>
+      <div id="status"></div>
+    </div>
+    <script>
+      const form = document.getElementById("asin-form");
+      const statusEl = document.getElementById("status");
+      const params = new URLSearchParams(window.location.search);
+      const asinFromQuery = params.get("asin");
+      if (asinFromQuery) {
+        form.asin.value = asinFromQuery;
+      }
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        statusEl.textContent = "";
+        const asin = form.asin.value.trim();
+        if (!asin) {
+          statusEl.textContent = "ASIN を入力してください。";
+          return;
+        }
+        form.querySelector("button").disabled = true;
+        try {
+          const response = await fetch("/asin-to-remember", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ asin }),
+          });
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || "登録に失敗しました。");
+          }
+          const result = await response.json();
+          statusEl.textContent = `登録しました: ${result.asin}`;
+          form.reset();
+        } catch (error) {
+          statusEl.textContent = error.message;
+        } finally {
+          form.querySelector("button").disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>
+"""
 
 def get_conn():
     return pymysql.connect(
@@ -124,6 +235,34 @@ class DocDetailIn(BaseModel):
 @app.get("/health")
 def health():
     return {"ok": True}
+
+@app.get("/asin-to-remember", response_class=HTMLResponse)
+def asin_to_remember_form():
+    return ASIN_FORM_HTML
+
+@app.post("/asin-to-remember")
+def save_asin_to_remember(asin: str = Form(..., max_length=10)):
+    now_ms = int(time.time() * 1000)
+    sql = """
+    INSERT INTO asin_to_remember (asin, count, lastUpdateTime)
+    VALUES (%s, %s, %s)
+    ON DUPLICATE KEY UPDATE
+     count=VALUES(count),
+     lastUpdateTime=VALUES(lastUpdateTime)
+    """
+
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute(sql, (asin, 0, now_ms))
+        return {"asin": asin, "lastUpdateTime": now_ms}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 @app.get("/mapcamera-jancode-mst")
 def get_jancode_mst(x_api_key: str = Header(default="")):
