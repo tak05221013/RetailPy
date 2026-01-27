@@ -1,12 +1,17 @@
 import os
 import json
 import time
+import secrets
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, Form, Header, HTTPException
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, Form, Header, HTTPException
 from fastapi.responses import HTMLResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel, Field
 import pymysql
+
+load_dotenv("/home/retail/py/env/asin-to-remember.env")
 
 API_KEY = os.environ.get("MC_LOG_API_KEY", "golden")
 MYSQL_HOST = os.environ.get("MC_MYSQL_HOST", "192.168.1.1")
@@ -15,6 +20,10 @@ MYSQL_USER = os.environ.get("MC_MYSQL_USER", "retail")
 MYSQL_PASS = os.environ.get("MC_MYSQL_PASS", "retailre2021")
 MYSQL_DB   = os.environ.get("MC_MYSQL_DB", "retail")
 JANCODE_MST_PATH = os.environ.get("MC_JANCODE_MST_PATH", "/home/retail/mst/map.jancode.mst")
+ASIN_AUTH_USER = os.environ.get("ASIN_TO_REMEMBER_USER")
+ASIN_AUTH_PASS = os.environ.get("ASIN_TO_REMEMBER_PASS")
+
+basic_security = HTTPBasic()
 
 app = FastAPI(title="MapCamera Log Ingest")
 
@@ -140,6 +149,18 @@ def get_conn():
         autocommit=True,
     )
 
+def require_asin_auth(credentials: HTTPBasicCredentials):
+    if not ASIN_AUTH_USER or not ASIN_AUTH_PASS:
+        raise HTTPException(status_code=500, detail="ASIN auth is not configured")
+    is_valid_user = secrets.compare_digest(credentials.username, ASIN_AUTH_USER)
+    is_valid_pass = secrets.compare_digest(credentials.password, ASIN_AUTH_PASS)
+    if not (is_valid_user and is_valid_pass):
+        raise HTTPException(
+            status_code=401,
+            detail="Unauthorized",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+
 def _to_json_or_text(value: Any):
     """
     value が dict/list/number/bool/null のように JSON として保存できるなら json列へ。
@@ -237,11 +258,16 @@ def health():
     return {"ok": True}
 
 @app.get("/asin-to-remember", response_class=HTMLResponse)
-def asin_to_remember_form():
+def asin_to_remember_form(credentials: HTTPBasicCredentials = Depends(basic_security)):
+    require_asin_auth(credentials)
     return ASIN_FORM_HTML
 
 @app.post("/asin-to-remember")
-def save_asin_to_remember(asin: str = Form(..., max_length=10)):
+def save_asin_to_remember(
+    asin: str = Form(..., max_length=10),
+    credentials: HTTPBasicCredentials = Depends(basic_security),
+):
+    require_asin_auth(credentials)
     now_ms = int(time.time() * 1000)
     sql = """
     INSERT INTO asin_to_remember (asin, count, lastUpdateTime)
