@@ -22,6 +22,7 @@ MYSQL_DB   = os.environ.get("MC_MYSQL_DB", "retail")
 JANCODE_MST_PATH = os.environ.get("MC_JANCODE_MST_PATH", "/home/retail/mst/map.jancode.mst")
 ASIN_AUTH_USER = os.environ.get("ASIN_TO_REMEMBER_USER")
 ASIN_AUTH_PASS = os.environ.get("ASIN_TO_REMEMBER_PASS")
+GOOGLE_SEARCH_CACHE_FLG = os.environ.get("GOOGLE_SEARCH_CACHE_FLG", "")
 
 basic_security = HTTPBasic()
 
@@ -138,6 +139,88 @@ ASIN_FORM_HTML = """
         }
       });
     </script>
+  </body>
+</html>
+"""
+
+def render_google_search_cache_form(current_value: str, message: Optional[str] = None) -> str:
+    status_html = f"<div id=\"status\">{message}</div>" if message else "<div id=\"status\"></div>"
+    return f"""
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Google 検索キャッシュ設定</title>
+    <style>
+      body {{
+        font-family: "Helvetica Neue", Arial, sans-serif;
+        background: #f6f7fb;
+        margin: 0;
+        padding: 40px 16px;
+        color: #1f2937;
+      }}
+      .card {{
+        max-width: 520px;
+        margin: 0 auto;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+        padding: 32px;
+      }}
+      h1 {{
+        font-size: 20px;
+        margin: 0 0 20px;
+      }}
+      label {{
+        display: block;
+        font-size: 14px;
+        margin-bottom: 8px;
+      }}
+      input[type="text"] {{
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 8px;
+        border: 1px solid #d1d5db;
+        font-size: 16px;
+      }}
+      button {{
+        margin-top: 16px;
+        background: #2563eb;
+        color: #fff;
+        border: none;
+        padding: 12px 18px;
+        border-radius: 8px;
+        font-size: 15px;
+        cursor: pointer;
+      }}
+      #current-value {{
+        font-size: 14px;
+        margin-bottom: 16px;
+        color: #4b5563;
+      }}
+      #status {{
+        margin-top: 16px;
+        font-size: 14px;
+      }}
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Google 検索キャッシュ設定</h1>
+      <div id="current-value">現在の値: <strong>{current_value or "(未設定)"}</strong></div>
+      <form method="post" action="/google-search-cache-flag">
+        <label for="google_search_cache_flg">google_search_cache_flg</label>
+        <input
+          id="google_search_cache_flg"
+          name="google_search_cache_flg"
+          type="text"
+          value="{current_value}"
+        />
+        <button type="submit">更新</button>
+      </form>
+      {status_html}
+    </div>
   </body>
 </html>
 """
@@ -294,6 +377,24 @@ def save_asin_to_remember(
             conn.close()
         except Exception:
             pass
+
+@app.get("/google-search-cache-flag", response_class=HTMLResponse)
+def google_search_cache_form(credentials: HTTPBasicCredentials = Depends(basic_security)):
+    require_asin_auth(credentials)
+    return render_google_search_cache_form(GOOGLE_SEARCH_CACHE_FLG)
+
+@app.post("/google-search-cache-flag", response_class=HTMLResponse)
+def update_google_search_cache_flag(
+    google_search_cache_flg: str = Form(...),
+    credentials: HTTPBasicCredentials = Depends(basic_security),
+):
+    require_asin_auth(credentials)
+    global GOOGLE_SEARCH_CACHE_FLG
+    GOOGLE_SEARCH_CACHE_FLG = google_search_cache_flg
+    return render_google_search_cache_form(
+        GOOGLE_SEARCH_CACHE_FLG,
+        message="更新しました。",
+    )
 
 @app.get("/mapcamera-jancode-mst")
 def get_jancode_mst(x_api_key: str = Header(default="")):
