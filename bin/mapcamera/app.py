@@ -237,6 +237,39 @@ def get_conn():
         autocommit=True,
     )
 
+def fetch_google_search_cache_flag() -> str:
+    sql = "SELECT flg FROM google_search_cache_flg LIMIT 1"
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            row = cur.fetchone()
+            if row and row.get("flg") is not None:
+                return str(row["flg"])
+    except Exception:
+        pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    return GOOGLE_SEARCH_CACHE_FLG
+
+def save_google_search_cache_flag(value: str) -> None:
+    update_sql = "UPDATE google_search_cache_flg SET flg=%s"
+    insert_sql = "INSERT INTO google_search_cache_flg (flg) VALUES (%s)"
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute(update_sql, (value,))
+            if cur.rowcount == 0:
+                cur.execute(insert_sql, (value,))
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
 def require_asin_auth(credentials: HTTPBasicCredentials):
     if not ASIN_AUTH_USER or not ASIN_AUTH_PASS:
         raise HTTPException(status_code=500, detail="ASIN auth is not configured")
@@ -381,7 +414,8 @@ def save_asin_to_remember(
 @app.get("/google-search-cache-flag", response_class=HTMLResponse)
 def google_search_cache_form(credentials: HTTPBasicCredentials = Depends(basic_security)):
     require_asin_auth(credentials)
-    return render_google_search_cache_form(GOOGLE_SEARCH_CACHE_FLG)
+    current_value = fetch_google_search_cache_flag()
+    return render_google_search_cache_form(current_value)
 
 @app.post("/google-search-cache-flag", response_class=HTMLResponse)
 def update_google_search_cache_flag(
@@ -389,10 +423,9 @@ def update_google_search_cache_flag(
     credentials: HTTPBasicCredentials = Depends(basic_security),
 ):
     require_asin_auth(credentials)
-    global GOOGLE_SEARCH_CACHE_FLG
-    GOOGLE_SEARCH_CACHE_FLG = google_search_cache_flg
+    save_google_search_cache_flag(google_search_cache_flg)
     return render_google_search_cache_form(
-        GOOGLE_SEARCH_CACHE_FLG,
+        google_search_cache_flg,
         message="更新しました。",
     )
 
